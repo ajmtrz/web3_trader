@@ -93,7 +93,7 @@ class TokenTrader:
         
     def get_token_balance(self):
         balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
-        return balance / (10 ** self.token_input_decimals)
+        return balance
         
     def get_price(self):
         price = self.uniswap.get_price_input(self.token_input_address, self.token_output_address, 10**self.token_input_decimals)
@@ -101,12 +101,10 @@ class TokenTrader:
     
     def make_swap(self, qty):
         try:
-            print(f"Vendiendo {qty} {self.token_input_symbol} a {self.get_price()} {self.token_output_symbol}")
-            # Convertir cantidad a la unidad correcta
-            qty = qty * (10 ** self.token_input_decimals)
+            print(f"Vendiendo {qty / (10 ** self.token_input_decimals)} {self.token_input_symbol} a {self.get_price()} {self.token_output_symbol}")
             while True:
                 try:
-                    tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, int(qty))
+                    tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
                     print(f"Esperando por confirmación de la transacción {tx_hash.hex()}")
                     # Esperar a que la transacción sea confirmada
                     tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
@@ -116,9 +114,13 @@ class TokenTrader:
                     else:
                         raise Exception(f"Transacción de swap fallida: {tx_hash.hex()}")
                 except Exception as e:
-                    print(f"Error en el swap: {e}")
-                    # Esperar 5 segundos antes de intentar nuevamente
-                    time.sleep(5)
+                    error_message = str(e)
+                    if "Insufficient balance" in error_message:
+                        print("Error: Balance insuficiente para realizar el swap.")
+                        break
+                    else:
+                        print(f"Error en el swap: {e}")
+                        time.sleep(5)
         except Exception as e:
             print(f"Error en la función make_swap: {e}")
 
@@ -128,7 +130,7 @@ class TokenTrader:
                 print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
                 self.claim_tokens()
                 balance = self.get_token_balance()
-                print(f"Balance actual: {(balance)} {self.token_input_symbol}")
+                print(f"Balance actual: {(balance / (10 ** self.token_input_decimals))} {self.token_input_symbol}")
                 price_in_usdt = self.get_price()
                 print(f"Precio actual: {price_in_usdt} {self.token_output_symbol}")
                 if price_in_usdt > 0.04 and balance > 0:
