@@ -1,4 +1,2 @@
 # Ignorar el archivo .env
 .env
-*.txt
-*.py
