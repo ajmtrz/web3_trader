@@ -79,17 +79,35 @@ class TokenTrader:
             print(f"Staking realizado! Transacción confirmada: {tx_hash.hex()}")
         else:
             raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
-
+    
+    def calculate_claimable_amount(self, vesting_data, user_data):
+        current_time = self.web3.eth.get_block('latest')['timestamp']
+        total_tokens = user_data[2] + user_data[4]
+        if user_data[5] == 0:
+            initial_claim_amount = (total_tokens * vesting_data[1]) // 1000
+            return initial_claim_amount
+        else:
+            duration_since_start = current_time - vesting_data[0]
+            total_vesting_periods = duration_since_start // vesting_data[2]
+            if total_vesting_periods > vesting_data[4]:
+                total_vesting_periods = vesting_data[4]
+            total_claimable_percent = vesting_data[1] + (total_vesting_periods * vesting_data[3])
+            total_claimable_amount = (total_tokens * total_claimable_percent) // 1000
+            claimable_now = total_claimable_amount - user_data[4]
+            return min(claimable_now, user_data[2])
+    
     def claim_tokens(self):
         try:
             user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
+            vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
             presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
             claim_enabled = presale_data[9]
             claim_at = user_data[1]
             claimable_amount = user_data[2]
+            claimable_now = self.calculate_claimable_amount(vesting_data, user_data)
             current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
             if claim_enabled and claim_at > 0 and current_timestamp >= claim_at and claimable_amount > 0:
-                print(f"Intentando reclamar {claimable_amount / 10**self.token_input_decimals} {self.token_input_symbol}.")
+                print(f"Intentando reclamar {claimable_now / 10**self.token_input_decimals} {self.token_input_symbol}.")
                 while True:
                     try:
                         tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
