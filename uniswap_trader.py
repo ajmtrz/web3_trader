@@ -79,51 +79,73 @@ class TokenTrader:
             print(f"Staking realizado! Transacción confirmada: {tx_hash.hex()}")
         else:
             raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
-    
+        
     def calculate_claimable_amount(self, vesting_data, user_data):
-        current_time = self.web3.eth.get_block('latest')['timestamp']
-        total_tokens = user_data[2] + user_data[4]
-        if user_data[5] == 0:
-            initial_claim_amount = (total_tokens * vesting_data[1]) // 1000
-            return initial_claim_amount
-        else:
-            duration_since_start = current_time - vesting_data[0]
-            total_vesting_periods = duration_since_start // vesting_data[2]
-            if total_vesting_periods > vesting_data[4]:
-                total_vesting_periods = vesting_data[4]
-            total_claimable_percent = vesting_data[1] + (total_vesting_periods * vesting_data[3])
-            total_claimable_amount = (total_tokens * total_claimable_percent) // 1000
-            claimable_now = total_claimable_amount - user_data[4]
-            return min(claimable_now, user_data[2])
+        current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
+        vesting_start_time = vesting_data[0]
+        initial_claim_percent = vesting_data[1]
+        vesting_time = vesting_data[2]
+        vesting_percentage = vesting_data[3]
+        claimable_amount = user_data[2]
+        claimed_amount = user_data[4]        
+        # Calcular los ciclos de vesting completados
+        cycles_completed = (current_timestamp - vesting_start_time) // vesting_time
+        # Calcular el porcentaje total reclamable hasta ahora
+        total_claimable_percent = initial_claim_percent + (vesting_percentage * cycles_completed)
+        # Asegurarse de que el porcentaje no exceda el 100%
+        if total_claimable_percent > 1000:
+            total_claimable_percent = 1000
+        # Calcular la cantidad total de tokens que se pueden reclamar hasta ahora
+        total_tokens = claimable_amount + claimed_amount
+        total_claimable_amount = (total_tokens * total_claimable_percent) // 1000
+        # Calcular la cantidad que se puede reclamar ahora
+        claimable_now = total_claimable_amount - claimed_amount
+        # Asegurarse de que no se reclamen más tokens de los que quedan disponibles
+        claimable_now = min(claimable_now, claimable_amount)
+        return claimable_now
+        
+    def can_claim_tokens(self):
+        user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
+        vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
+        presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
+        claim_enabled = presale_data[9]
+        claim_at = user_data[1]
+        claimable_amount = user_data[2]
+        vesting_start_time = vesting_data[0]
+        claim_count = user_data[5]
+        vesting_interval = vesting_data[2]
+        current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
+        # Verificar si está permitido reclamar
+        if not claim_enabled or claimable_amount <= 0:
+            return False, 0
+        print(f"start_time: {vesting_start_time} | interval: {vesting_interval}")
+        # Verificar si es el primer reclamo
+        if claim_at == 0 and current_timestamp >= vesting_start_time:
+            return True, self.calculate_claimable_amount(vesting_data, user_data)
+        # Calcular el número de ciclos de vesting completados
+        cycles_completed = (current_timestamp - vesting_start_time) // vesting_interval
+        if cycles_completed >= claim_count + 1:
+            return True, self.calculate_claimable_amount(vesting_data, user_data)
+        return False, 0
     
     def claim_tokens(self):
-        try:
-            user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
-            vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
-            presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
-            claim_enabled = presale_data[9]
-            claim_at = user_data[1]
-            claimable_amount = user_data[2]
-            claimable_now = self.calculate_claimable_amount(vesting_data, user_data)
-            current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
-            if claim_enabled and claim_at > 0 and current_timestamp >= claim_at and claimable_amount > 0:
-                print(f"Intentando reclamar {claimable_now / 10**self.token_input_decimals} {self.token_input_symbol}.")
-                while True:
-                    try:
-                        tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
-                        print(f"Transacción de reclamo enviada con hash: {tx_hash.hex()}")
-                        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-                        if tx_receipt.status == 1:
-                            print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
-                            break
-                        else:
-                            raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
-                    except Exception as tx_exception:
-                        print(f"Error en la transacción: {tx_exception}")
-            else:
-                print("No se puede reclamar en este momento.")
-        except Exception as e:
-            print(f"Error en el reclamo: {e}")
+        claim_enabled, claimable_amount = self.can_claim_tokens()
+        if claim_enabled:
+            print(f"Intentando reclamar {claimable_amount / 10**self.token_input_decimals} {self.token_input_symbol}.")
+            while True:
+                try:
+                    tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
+                    print(f"Transacción de reclamo enviada con hash: {tx_hash.hex()}")
+                    tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+                    if tx_receipt.status == 1:
+                        print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
+                        break
+                    else:
+                        raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
+                except Exception as tx_exception:
+                    print(f"Error en la transacción: {tx_exception}")
+        else:
+            print("No se puede reclamar en este momento.")
     
     def make_swap(self, qty, price):
         print(f"Vendiendo {qty / (10 ** self.token_input_decimals)} {self.token_input_symbol} a {price} {self.token_output_symbol}")
