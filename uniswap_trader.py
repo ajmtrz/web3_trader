@@ -56,7 +56,30 @@ class TokenTrader:
         except Exception as e:
             print(f"Ha ocurrido un error al obtener el ABI: {e}")
             return None
+        
+    def staking_balance(self, contract_address, account_address, abi):
+        contract = self.web3.eth.contract(address=contract_address, abi=abi)
+        balance = contract.functions.getStakingBalance(account_address).call()
+        return balance
     
+    def stake_tokens(self, contract_address, abi, amount):
+        contract = self.web3.eth.contract(address=contract_address, abi=abi)
+        tx_hash = contract.functions.stakeTokens(amount).transact()
+        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if tx_receipt.status == 1:
+            print(f"Staking realizado! Transacción confirmada: {tx_hash.hex()}")
+        else:
+            raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
+
+    def unstake_tokens(self, contract_address, abi, amount):
+        contract = self.web3.eth.contract(address=contract_address, abi=abi)
+        tx_hash = contract.functions.unstakeTokens(amount).transact()
+        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if tx_receipt.status == 1:
+            print(f"Staking realizado! Transacción confirmada: {tx_hash.hex()}")
+        else:
+            raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
+
     def claim_tokens(self):
         try:
             user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
