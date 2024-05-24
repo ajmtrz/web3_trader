@@ -4,12 +4,12 @@ from web3.gas_strategies.rpc import rpc_gas_price_strategy
 from web3.gas_strategies.time_based import fast_gas_price_strategy
 from uniswap import Uniswap
 import requests
-from dotenv import load_dotenv
-import os
 import json
 import time
 from datetime import datetime, timezone
 import numpy as np
+import gnupg
+import keyring
 
 # %%
 class TokenTrader:
@@ -177,11 +177,15 @@ class TokenTrader:
 # %%
 # Configuración
 if __name__ == "__main__":
-    if load_dotenv():
+    gpg = gnupg.GPG()
+    with open('C:\\Users\\Administrador\\Repositorios\\web3_trader\\.env.gpg', 'rb') as file:
+        datos = gpg.decrypt_file(file, passphrase=keyring.get_password("GPG_Passphrase", "gpg_python"))
+    if datos.ok:
+        env_vars = dict(line.decode('utf-8').split('=', 1) for line in datos.data.splitlines())
+        etherscan_api_key = env_vars.get('ETHERSCAN_API_KEY')
+        wallet_address = env_vars.get('WALLET_ADDRESS')
+        private_key = env_vars.get('PRIVATE_KEY')
         rpc_url = "https://rpc.ankr.com/eth"
-        etherscan_api_key = os.getenv("ETHERSCAN_API_KEY")
-        wallet_address = os.getenv("WALLET_ADDRESS")
-        private_key = os.getenv("PRIVATE_KEY")
         uniswap_contract_address = "0x1458770554b8918B970444d8b2c02A47F6dF99A7"
         token_input_address = "0x26EbB8213fb8D66156F1Af8908d43f7e3e367C1d"
         token_output_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
