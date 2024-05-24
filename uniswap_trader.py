@@ -109,24 +109,26 @@ class TokenTrader:
     def trade(self):
         while True:
             try:
-                print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
-                price = (self.uniswap.get_price_input(
-                                    self.token_input_address,
-                                    self.token_output_address,
-                                    10**self.token_input_decimals)
-                                / 10**self.token_output_decimals)
-                print(f"Precio actual: {price} {self.token_output_symbol}")
-                if price > 1.0:
-                    self.claim_tokens()
-                    balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
-                    balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
-                    print(f"Balance actual: {balance_float} {self.token_input_symbol}")
-                    if balance_float > 0:
-                        self.make_swap(balance_int, price)
-                else:
-                    time.sleep(5)
-                    continue
-                time.sleep(1)
+                if self.web3.is_connected():
+                    print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
+                    price = (self.uniswap.get_price_input(
+                                        self.token_input_address,
+                                        self.token_output_address,
+                                        10**self.token_input_decimals)
+                                    / 10**self.token_output_decimals)
+                    print(f"Precio actual: {price} {self.token_output_symbol}")
+                    if price > 1.0:
+                        self.claim_tokens()
+                        balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
+                        balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
+                        print(f"Balance actual: {balance_float} {self.token_input_symbol}")
+                        if balance_float > 0:
+                            self.make_swap(balance_int, price)
+                    else:
+                        # Claim y staking
+                        time.sleep(5)
+                        continue
+                    time.sleep(1)
             except Exception as e:
                 print(f"Ha ocurrido un error: {e}")
                 time.sleep(1)
