@@ -1,6 +1,7 @@
 # %%
 from web3 import Web3
 from web3.gas_strategies.rpc import rpc_gas_price_strategy
+from web3.gas_strategies.time_based import fast_gas_price_strategy
 from uniswap import Uniswap
 import requests
 from dotenv import load_dotenv
@@ -16,7 +17,7 @@ class TokenTrader:
                  token_input_address, token_output_address, token_presale_contract_address, presale_id):
         self.rpc_url = rpc_url
         self.web3 = Web3(Web3.HTTPProvider(rpc_url))
-        self.web3.eth.set_gas_price_strategy(rpc_gas_price_strategy)
+        self.web3.eth.set_gas_price_strategy(fast_gas_price_strategy)
         self.etherscan_api_key = etherscan_api_key
         self.wallet_address = wallet_address
         self.private_key = private_key
@@ -49,7 +50,6 @@ class TokenTrader:
             url = f"https://api.etherscan.io/api?module=contract&action=getabi&address={contract_address}&apikey={self.etherscan_api_key}"
             response = requests.get(url)
             response_json = response.json()
-            # Comprueba si la solicitud fue exitosa y si hay un ABI disponible
             if response_json['status'] == '1' and response_json['message'] == 'OK':
                 abi = json.loads(response_json['result'])
                 return abi
@@ -59,86 +59,73 @@ class TokenTrader:
     
     def claim_tokens(self):
         try:
-            # Obtener info
             user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
             presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
             claim_enabled = presale_data[9]
             claim_at = user_data[1]
             claimable_amount = user_data[2]
-            # Obtener la marca de tiempo actual
             current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
-            # Condiciones para hacer reclamo
             if claim_enabled and claim_at > 0 and current_timestamp >= claim_at and claimable_amount > 0:
                 print(f"Intentando reclamar {claimable_amount / 10**self.token_input_decimals} {self.token_input_symbol}.")
                 while True:
                     try:
-                        tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact({
-                            'from': self.wallet_address,
-                            'gasPrice': self.web3.eth.generate_gas_price()
-                        })
+                        tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
                         print(f"Transacción de reclamo enviada con hash: {tx_hash.hex()}")
-                        # Esperar a que la transacción sea confirmada
                         tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
                         if tx_receipt.status == 1:
                             print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
                             break
                         else:
-                            print(f"Transacción de reclamo fallida: {tx_hash.hex()}")
+                            raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
                     except Exception as tx_exception:
                         print(f"Error en la transacción: {tx_exception}")
             else:
                 print("No se puede reclamar en este momento.")
         except Exception as e:
             print(f"Error en el reclamo: {e}")
-        
-    def get_token_balance(self):
-        balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
-        return balance
-        
-    def get_price(self):
-        price = self.uniswap.get_price_input(self.token_input_address, self.token_output_address, 10**self.token_input_decimals)
-        return price / 10**self.token_output_decimals
     
-    def make_swap(self, qty):
-        try:
-            print(f"Vendiendo {qty / (10 ** self.token_input_decimals)} {self.token_input_symbol} a {self.get_price()} {self.token_output_symbol}")
-            while True:
-                try:
-                    tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
-                    print(f"Esperando por confirmación de la transacción {tx_hash.hex()}")
-                    # Esperar a que la transacción sea confirmada
-                    tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-                    if tx_receipt.status == 1:
-                        print(f"Swap realizado! Transacción confirmada: {tx_hash.hex()}")
-                        break
-                    else:
-                        raise Exception(f"Transacción de swap fallida: {tx_hash.hex()}")
-                except Exception as e:
-                    error_message = str(e)
-                    if "Insufficient balance" in error_message:
-                        print("Error: Balance insuficiente para realizar el swap.")
-                        break
-                    else:
-                        print(f"Error en el swap: {e}")
-                        time.sleep(5)
-        except Exception as e:
-            print(f"Error en la función make_swap: {e}")
+    def make_swap(self, qty, price):
+        print(f"Vendiendo {qty / (10 ** self.token_input_decimals)} {self.token_input_symbol} a {price} {self.token_output_symbol}")
+        while True:
+            try:
+                tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
+                print(f"Esperando por confirmación de la transacción {tx_hash.hex()}")
+                # Esperar a que la transacción sea confirmada
+                tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+                if tx_receipt.status == 1:
+                    print(f"Swap realizado! Transacción confirmada: {tx_hash.hex()}")
+                    break
+                else:
+                    raise Exception(f"Transacción de swap fallida: {tx_hash.hex()}")
+            except Exception as e:
+                error_message = str(e)
+                if "Insufficient balance" in error_message:
+                    print("Error: Balance insuficiente para realizar el swap.")
+                    break
+                else:
+                    print(f"Error en el swap: {e}")
+                    time.sleep(5)
 
     def trade(self):
         while True:
             try:
                 print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
-                self.claim_tokens()
-                balance = self.get_token_balance()
-                print(f"Balance actual: {(balance / (10 ** self.token_input_decimals))} {self.token_input_symbol}")
-                price_in_usdt = self.get_price()
-                print(f"Precio actual: {price_in_usdt} {self.token_output_symbol}")
-                if price_in_usdt > 0.04 and balance > 0:
-                    self.make_swap(balance)
+                price = (self.uniswap.get_price_input(
+                                    self.token_input_address,
+                                    self.token_output_address,
+                                    10**self.token_input_decimals)
+                                / 10**self.token_output_decimals)
+                print(f"Precio actual: {price} {self.token_output_symbol}")
+                if price > 1.0:
+                    self.claim_tokens()
+                    balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
+                    balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
+                    print(f"Balance actual: {balance_float} {self.token_input_symbol}")
+                    if balance_float > 0:
+                        self.make_swap(balance_int, price)
                 else:
                     time.sleep(5)
                     continue
-                # Espero 1 segundo
                 time.sleep(1)
             except Exception as e:
                 print(f"Ha ocurrido un error: {e}")
