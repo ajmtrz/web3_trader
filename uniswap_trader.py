@@ -80,58 +80,32 @@ class TokenTrader:
         else:
             raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
         
-    def calculate_claimable_amount(self, vesting_data, user_data):
-        current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
-        vesting_start_time = vesting_data[0]
-        initial_claim_percent = vesting_data[1]
-        vesting_time = vesting_data[2]
-        vesting_percentage = vesting_data[3]
-        claimable_amount = user_data[2]
-        claimed_amount = user_data[4]        
-        # Calcular los ciclos de vesting completados
-        cycles_completed = (current_timestamp - vesting_start_time) // vesting_time
-        # Calcular el porcentaje total reclamable hasta ahora
-        total_claimable_percent = initial_claim_percent + (vesting_percentage * cycles_completed)
-        # Asegurarse de que el porcentaje no exceda el 100%
-        if total_claimable_percent > 1000:
-            total_claimable_percent = 1000
-        # Calcular la cantidad total de tokens que se pueden reclamar hasta ahora
-        total_tokens = claimable_amount + claimed_amount
-        total_claimable_amount = (total_tokens * total_claimable_percent) // 1000
-        # Calcular la cantidad que se puede reclamar ahora
-        claimable_now = total_claimable_amount - claimed_amount
-        # Asegurarse de que no se reclamen más tokens de los que quedan disponibles
-        claimable_now = min(claimable_now, claimable_amount)
-        return claimable_now
-        
     def can_claim_tokens(self):
+        presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
         user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
         vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
-        presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
         claim_enabled = presale_data[9]
-        claim_at = user_data[1]
         claimable_amount = user_data[2]
-        vesting_start_time = vesting_data[0]
         claim_count = user_data[5]
+        vesting_start_time = vesting_data[0]
         vesting_interval = vesting_data[2]
+        total_claim_cycles = vesting_data[4]
         current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
         # Verificar si está permitido reclamar
-        if not claim_enabled or claimable_amount <= 0:
-            return False, 0
-        print(f"start_time: {vesting_start_time} | interval: {vesting_interval}")
-        # Verificar si es el primer reclamo
-        if claim_at == 0 and current_timestamp >= vesting_start_time:
-            return True, self.calculate_claimable_amount(vesting_data, user_data)
-        # Calcular el número de ciclos de vesting completados
-        cycles_completed = (current_timestamp - vesting_start_time) // vesting_interval
-        if cycles_completed >= claim_count + 1:
-            return True, self.calculate_claimable_amount(vesting_data, user_data)
-        return False, 0
+        if claim_enabled and claimable_amount > 0 and vesting_start_time > 0:
+            if claim_count == 0:
+                if current_timestamp >= vesting_start_time:
+                    return True
+            else:
+                duration_since_start = current_timestamp - vesting_start_time
+                available_cycles = duration_since_start // vesting_interval
+                if available_cycles > claim_count and available_cycles <= total_claim_cycles:
+                    return True
+        return False
     
     def claim_tokens(self):
-        claim_enabled, claimable_amount = self.can_claim_tokens()
-        if claim_enabled:
-            print(f"Intentando reclamar {claimable_amount / 10**self.token_input_decimals} {self.token_input_symbol}.")
+        if self.can_claim_tokens():
+            print(f"Intentando reclamar.")
             while True:
                 try:
                     tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
