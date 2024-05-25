@@ -2,6 +2,7 @@
 from web3 import Web3, middleware
 #from web3.gas_strategies.rpc import rpc_gas_price_strategy
 from web3.gas_strategies.time_based import fast_gas_price_strategy
+from web3.middleware import construct_sign_and_send_raw_middleware
 from uniswap import Uniswap
 import requests
 import json
@@ -16,14 +17,16 @@ class TokenTrader:
     def __init__(self, rpc_url, etherscan_api_key, wallet_address, private_key, uniswap_contract_address, 
                  token_input_address, token_output_address, token_presale_contract_address, presale_id):
         self.rpc_url = rpc_url
+        self.etherscan_api_key = etherscan_api_key
         self.web3 = Web3(Web3.HTTPProvider(rpc_url))
         self.web3.eth.set_gas_price_strategy(fast_gas_price_strategy)
         self.web3.middleware_onion.add(middleware.time_based_cache_middleware)
         self.web3.middleware_onion.add(middleware.latest_block_based_cache_middleware)
         self.web3.middleware_onion.add(middleware.simple_cache_middleware)
-        self.etherscan_api_key = etherscan_api_key
         self.wallet_address = self.web3.to_checksum_address(wallet_address)
         self.private_key = private_key
+        self.web3.eth.default_account = self.wallet_address
+        self.web3.middleware_onion.add(construct_sign_and_send_raw_middleware(self.private_key))
         # Init Web3 objects
         self.uniswap_contract_address = self.web3.to_checksum_address(uniswap_contract_address)
         self.uniswap_swap_contract_abi = self.get_contract_abi(self.uniswap_contract_address)
@@ -107,20 +110,11 @@ class TokenTrader:
         return False
     
     def claim_tokens(self):
-        if True:#self.can_claim_tokens():
+        if self.can_claim_tokens():
             print(f"Intentando reclamar...")
             while True:
                 try:
-                    unsent_billboard_tx = self.token_presale_contract_object.functions.claimAmount(self.presale_id).build_transaction({
-                        "from": self.wallet_address,
-                        "nonce": self.web3.eth.get_transaction_count(self.wallet_address)
-                    })
-                    gas_estimate = self.web3.eth.estimate_gas(unsent_billboard_tx)
-                    unsent_billboard_tx['gas'] = gas_estimate
-                    gas_price = self.web3.eth.generate_gas_price(unsent_billboard_tx)
-                    unsent_billboard_tx['gasPrice'] = gas_price
-                    signed_tx = self.web3.eth.account.sign_transaction(unsent_billboard_tx, private_key=self.private_key)
-                    tx_hash = self.web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+                    tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
                     print(f"Esperando por confirmación de la transacción de reclamo: {tx_hash.hex()}")
                     tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
                     if tx_receipt.status == 1:
