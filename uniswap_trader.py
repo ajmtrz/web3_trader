@@ -19,7 +19,7 @@ class TokenTrader:
         self.web3 = Web3(Web3.HTTPProvider(rpc_url))
         self.web3.eth.set_gas_price_strategy(fast_gas_price_strategy)
         self.etherscan_api_key = etherscan_api_key
-        self.wallet_address = wallet_address
+        self.wallet_address = self.web3.to_checksum_address(wallet_address)
         self.private_key = private_key
         # Init Web3 objects
         self.uniswap_contract_address = self.web3.to_checksum_address(uniswap_contract_address)
@@ -105,11 +105,11 @@ class TokenTrader:
     
     def claim_tokens(self):
         if self.can_claim_tokens():
-            print(f"Intentando reclamar.")
+            print(f"Intentando reclamar...")
             while True:
                 try:
                     tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
-                    print(f"Transacción de reclamo enviada con hash: {tx_hash.hex()}")
+                    print(f"Esperando por confirmación de la transacción de reclamo: {tx_hash.hex()}")
                     tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
                     if tx_receipt.status == 1:
                         print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
@@ -117,7 +117,8 @@ class TokenTrader:
                     else:
                         raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
                 except Exception as tx_exception:
-                    print(f"Error en la transacción: {tx_exception}")
+                    print(f"Error en el reclamo: {tx_exception}")
+                    time.sleep(5)
         else:
             print("No se puede reclamar en este momento.")
     
@@ -126,7 +127,7 @@ class TokenTrader:
         while True:
             try:
                 tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
-                print(f"Esperando por confirmación de la transacción {tx_hash.hex()}")
+                print(f"Esperando por confirmación de la transacción de swap: {tx_hash.hex()}")
                 # Esperar a que la transacción sea confirmada
                 tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
                 if tx_receipt.status == 1:
@@ -134,13 +135,8 @@ class TokenTrader:
                     break
                 else:
                     raise Exception(f"Transacción de swap fallida: {tx_hash.hex()}")
-            except Exception as e:
-                error_message = str(e)
-                if "Insufficient balance" in error_message:
-                    print("Error: Balance insuficiente para realizar el swap.")
-                    break
-                else:
-                    print(f"Error en el swap: {e}")
+            except Exception as tx_exception:
+                    print(f"Error en el swap: {tx_exception}")
                     time.sleep(5)
 
     def trade(self):
