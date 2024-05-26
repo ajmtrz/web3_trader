@@ -15,7 +15,7 @@ import keyring
 # %%
 class TokenTrader:
     def __init__(self, etherscan_api_key, wallet_address, private_key, token_input_address, 
-                 token_output_address, token_presale_contract_address, presale_id):
+                 token_output_address, token_presale_contract_address):
         self.rpc_url = "https://rpc.ankr.com/eth"
         self.etherscan_api_key = etherscan_api_key
         self.web3 = Web3(Web3.HTTPProvider(self.rpc_url))
@@ -33,7 +33,7 @@ class TokenTrader:
         self.token_presale_contract_address = self.web3.to_checksum_address(token_presale_contract_address)
         self.token_presale_contract_abi = self.get_contract_abi(self.token_presale_contract_address)
         self.token_presale_contract_object = self.web3.eth.contract(address=self.token_presale_contract_address, abi=self.token_presale_contract_abi)
-        self.presale_id = presale_id
+        self.presale_id = 2
         # Init Token INPUT objects
         self.token_input_address = self.web3.to_checksum_address(token_input_address)
         self.token_input_abi = self.get_contract_abi(self.token_input_address)
@@ -164,12 +164,13 @@ class TokenTrader:
                         time.sleep(5)
                         continue
                     time.sleep(1)
+                else:
+                    raise Exception(f"Error al conectar a la red de Ethereum")
             except Exception as e:
                 print(f"Ha ocurrido un error: {e}")
-                time.sleep(1)
+                time.sleep(5)
 
 # %%
-# Configuración
 if __name__ == "__main__":
     gpg = gnupg.GPG()
     with open('C:\\Users\\Administrador\\Repositorios\\web3_trader\\.env.gpg', 'rb') as file:
@@ -182,12 +183,10 @@ if __name__ == "__main__":
         token_input_address = "0x26EbB8213fb8D66156F1Af8908d43f7e3e367C1d"
         token_output_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         token_presale_contract_address = "0x602C90D796D746b97a36f075d9f3b2892B9B07c2"
-        presale_id = 2
         token_trader = TokenTrader(etherscan_api_key,
                                 wallet_address, 
                                 private_key,
                                 token_input_address,
                                 token_output_address,
-                                token_presale_contract_address,
-                                presale_id)
+                                token_presale_contract_address)
         token_trader.trade()
