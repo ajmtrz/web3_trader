@@ -14,23 +14,19 @@ import keyring
 
 # %%
 class TokenTrader:
-    def __init__(self, rpc_url, etherscan_api_key, wallet_address, private_key, uniswap_contract_address, 
-                 token_input_address, token_output_address, token_presale_contract_address, presale_id):
-        self.rpc_url = rpc_url
+    def __init__(self, etherscan_api_key, wallet_address, private_key, token_input_address, 
+                 token_output_address, token_presale_contract_address, presale_id):
+        self.rpc_url = "https://rpc.ankr.com/eth"
         self.etherscan_api_key = etherscan_api_key
-        self.web3 = Web3(Web3.HTTPProvider(rpc_url))
+        self.web3 = Web3(Web3.HTTPProvider(self.rpc_url))
         self.web3.eth.set_gas_price_strategy(fast_gas_price_strategy)
         self.web3.middleware_onion.add(middleware.time_based_cache_middleware)
         self.web3.middleware_onion.add(middleware.latest_block_based_cache_middleware)
         self.web3.middleware_onion.add(middleware.simple_cache_middleware)
-        self.wallet_address = self.web3.to_checksum_address(wallet_address)
         self.private_key = private_key
+        self.wallet_address = self.web3.to_checksum_address(wallet_address)
         self.web3.eth.default_account = self.wallet_address
         self.web3.middleware_onion.add(construct_sign_and_send_raw_middleware(self.private_key))
-        # Init Web3 objects
-        self.uniswap_contract_address = self.web3.to_checksum_address(uniswap_contract_address)
-        self.uniswap_swap_contract_abi = self.get_contract_abi(self.uniswap_contract_address)
-        self.uniswap_swap_contract_object = self.web3.eth.contract(address=self.uniswap_contract_address, abi=self.uniswap_swap_contract_abi)
         # Init Uniswap object
         self.uniswap = Uniswap(address=self.wallet_address, private_key=self.private_key, version=3, web3=self.web3, provider=self.rpc_url)
         # Presale contract
@@ -183,17 +179,13 @@ if __name__ == "__main__":
         etherscan_api_key = env_vars.get('ETHERSCAN_API_KEY')
         wallet_address = env_vars.get('WALLET_ADDRESS')
         private_key = env_vars.get('PRIVATE_KEY')
-        rpc_url = "https://rpc.ankr.com/eth"
-        uniswap_contract_address = "0x1458770554b8918B970444d8b2c02A47F6dF99A7"
         token_input_address = "0x26EbB8213fb8D66156F1Af8908d43f7e3e367C1d"
         token_output_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         token_presale_contract_address = "0x602C90D796D746b97a36f075d9f3b2892B9B07c2"
         presale_id = 2
-        token_trader = TokenTrader(rpc_url,
-                                etherscan_api_key,
+        token_trader = TokenTrader(etherscan_api_key,
                                 wallet_address, 
                                 private_key,
-                                uniswap_contract_address,
                                 token_input_address,
                                 token_output_address,
                                 token_presale_contract_address,
