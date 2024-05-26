@@ -167,7 +167,7 @@ class TokenTrader:
                         balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
                         balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
                         print(f"Balance actual: {balance_float} {self.token_input_symbol}")
-                        if balance_float > 0:
+                        if balance_int > 0:
                             self.make_swap(balance_int, price)
                     else:
                         # Claim y staking
