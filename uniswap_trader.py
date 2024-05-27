@@ -162,7 +162,7 @@ class TokenTrader:
                                         10**self.token_input_decimals)
                                     / 10**self.token_output_decimals)
                     print(f"Precio actual: {price} {self.token_output_symbol}")
-                    if price > 1.0:
+                    if price > 0.4:
                         self.claim_tokens()
                         balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
                         balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
