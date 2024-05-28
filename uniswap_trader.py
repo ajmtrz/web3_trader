@@ -46,6 +46,8 @@ class TokenTrader:
         self.token_output_object = self.web3.eth.contract(address=self.token_output_address, abi=self.token_output_abi)
         self.token_output_symbol = self.token_output_object.functions.symbol().call()
         self.token_output_decimals = self.token_output_object.functions.decimals().call()
+        # Prices array
+        self.token_prices = np.linspace(0.09, 2.99, 20)
      
     def get_contract_abi(self, contract_address):
         try:
@@ -82,16 +84,13 @@ class TokenTrader:
         else:
             raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
         
-    def can_claim_tokens(self):
-        presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
-        user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
-        vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
+    def can_claim_tokens(self, presale_data, vesting_data, user_data):
         claim_enabled = presale_data[9]
-        claimable_amount = user_data[2]
-        claim_count = user_data[5]
         vesting_start_time = vesting_data[0]
         vesting_interval = vesting_data[2]
         total_claim_cycles = vesting_data[4]
+        claimable_amount = user_data[2]
+        claim_count = user_data[5]
         current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
         # debug
         print(f'''\n
@@ -115,8 +114,8 @@ class TokenTrader:
                     return True
         return False
     
-    def claim_tokens(self):
-        if self.can_claim_tokens():
+    def claim_tokens(self, presale_data, vesting_data, user_data):
+        if self.can_claim_tokens(presale_data, vesting_data, user_data):
             print(f"Intentando reclamar...")
             while True:
                 try:
@@ -156,14 +155,18 @@ class TokenTrader:
             try:
                 if self.web3.is_connected():
                     print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
+                    presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
+                    vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
+                    user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
+                    min_sell_price = self.token_prices[user_data[5]]
                     price = (self.uniswap.get_price_input(
                                         self.token_input_address,
                                         self.token_output_address,
                                         10**self.token_input_decimals)
                                     / 10**self.token_output_decimals)
-                    print(f"Precio actual: {price} {self.token_output_symbol}")
-                    if price > 0.08:
-                        self.claim_tokens()
+                    print(f"Precio actual: {price} {self.token_output_symbol} | Mínimo: {min_sell_price}")
+                    if price > min_sell_price:
+                        self.claim_tokens(presale_data, vesting_data, user_data)
                         balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
                         balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
                         print(f"Balance actual: {balance_float} {self.token_input_symbol}")
