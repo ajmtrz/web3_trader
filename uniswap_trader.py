@@ -14,7 +14,7 @@ import keyring
 # %%
 class TokenTrader:
     def __init__(self, etherscan_api_key, wallet_address, private_key, token_input_address, 
-                 token_output_address, token_presale_contract_address):
+                 token_output_address, token_presale_contract_address, uniswap_factory_contract_address):
         self.rpc_url = "https://rpc.ankr.com/eth"
         self.etherscan_api_key = etherscan_api_key
         self.web3 = Web3(Web3.HTTPProvider(self.rpc_url))
@@ -27,7 +27,8 @@ class TokenTrader:
         self.web3.eth.default_account = self.wallet_address
         self.web3.middleware_onion.add(construct_sign_and_send_raw_middleware(self.private_key))
         # Init Uniswap object
-        self.uniswap = Uniswap(address=self.wallet_address, private_key=self.private_key, version=3, web3=self.web3, provider=self.rpc_url)
+        self.uniswap_factory_contract_address = self.web3.to_checksum_address(uniswap_factory_contract_address)
+        self.uniswap = Uniswap(address=self.wallet_address, private_key=self.private_key, version=3, web3=self.web3, provider=self.rpc_url, factory_contract_addr=self.uniswap_factory_contract_address)
         # Presale contract
         self.token_presale_contract_address = self.web3.to_checksum_address(token_presale_contract_address)
         self.token_presale_contract_abi = self.get_contract_abi(self.token_presale_contract_address)
@@ -129,7 +130,7 @@ class TokenTrader:
     def make_swap(self, qty, price):
         print(f"Vendiendo {qty / (10 ** self.token_input_decimals)} {self.token_input_symbol} a {price} {self.token_output_symbol}")
         try:
-            tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
+            tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty, fee=3000)
             print(f"Esperando por confirmación de la transacción de swap: {tx_hash.hex()}")
             tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
             if tx_receipt.status == 1:
@@ -144,28 +145,19 @@ class TokenTrader:
             try:
                 if self.web3.is_connected():
                     print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
+                    price = (self.uniswap.get_price_input(self.token_input_address, self.token_output_address, 10**self.token_input_decimals, fee=3000)
+                             / 10**self.token_output_decimals)
                     presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
                     vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
                     user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
                     min_sell_price = self.token_prices[user_data[5]]
-                    price = (self.uniswap.get_price_input(
-                                        self.token_input_address,
-                                        self.token_output_address,
-                                        10**self.token_input_decimals)
-                                    / 10**self.token_output_decimals)
-                    print(f"Precio actual: {price} {self.token_output_symbol} | Mínimo: {min_sell_price}")
-                    if price > min_sell_price:
-                        if self.can_claim_tokens(presale_data, vesting_data, user_data):
-                            self.claim_tokens()
-                        balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
-                        balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
-                        print(f"Balance actual: {balance_float} {self.token_input_symbol}")
-                        if balance_int > 0:
-                            self.make_swap(balance_int, price)
-                    else:
-                        # Claim y staking
-                        time.sleep(5)
-                        continue
+                    print(f"Precio actual: {price} {self.token_output_symbol} | Umbral mínimo: {min_sell_price:.6f} {self.token_output_symbol}")
+                    if self.can_claim_tokens(presale_data, vesting_data, user_data):
+                        if price > min_sell_price:
+                                self.claim_tokens()
+                                balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
+                                if balance_int > 0:
+                                    self.make_swap(balance_int, price)
                     time.sleep(1)
                 else:
                     raise Exception(f"Error al conectar a la red de Ethereum")
@@ -186,10 +178,12 @@ if __name__ == "__main__":
         token_input_address = "0x26EbB8213fb8D66156F1Af8908d43f7e3e367C1d"
         token_output_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         token_presale_contract_address = "0x602C90D796D746b97a36f075d9f3b2892B9B07c2"
+        uniswap_factory_contract_address = "0x1458770554b8918B970444d8b2c02A47F6dF99A7"
         token_trader = TokenTrader(etherscan_api_key,
                                 wallet_address, 
                                 private_key,
                                 token_input_address,
                                 token_output_address,
-                                token_presale_contract_address)
+                                token_presale_contract_address,
+                                uniswap_factory_contract_address)
         token_trader.trade()
