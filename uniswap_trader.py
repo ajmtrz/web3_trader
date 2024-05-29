@@ -91,16 +91,6 @@ class TokenTrader:
         claimable_amount = user_data[2]
         claim_count = user_data[5]
         current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
-        # debug
-        #print(f'''\n
-        #        | claim_enabled={claim_enabled} |
-        #        | claimable_amount={claimable_amount} |
-        #        | claim_count={claim_count} |
-        #        | vesting_start_time={vesting_start_time} |
-        #        | vesting_interval={vesting_interval} |
-        #        | total_claim_cycles={total_claim_cycles} |
-        #        | current_timestamp={current_timestamp} |
-        #        \n''')
         # Verificar si está permitido reclamar
         if claim_enabled and claimable_amount > 0:
             current_date = datetime.fromtimestamp(current_timestamp)
