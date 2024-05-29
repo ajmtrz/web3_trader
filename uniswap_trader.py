@@ -92,17 +92,27 @@ class TokenTrader:
         claim_count = user_data[5]
         current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
         # debug
-        print(f'''\n
-                | claim_enabled={claim_enabled} |
-                | claimable_amount={claimable_amount} |
-                | claim_count={claim_count} |
-                | vesting_start_time={vesting_start_time} |
-                | vesting_interval={vesting_interval} |
-                | total_claim_cycles={total_claim_cycles} |
-                | current_timestamp={current_timestamp} |
-                \n''')
+        #print(f'''\n
+        #        | claim_enabled={claim_enabled} |
+        #        | claimable_amount={claimable_amount} |
+        #        | claim_count={claim_count} |
+        #        | vesting_start_time={vesting_start_time} |
+        #        | vesting_interval={vesting_interval} |
+        #        | total_claim_cycles={total_claim_cycles} |
+        #        | current_timestamp={current_timestamp} |
+        #        \n''')
         # Verificar si está permitido reclamar
         if claim_enabled and claimable_amount > 0:
+            current_date = datetime.fromtimestamp(current_timestamp)
+            future_date = datetime.fromtimestamp(vesting_start_time + vesting_interval * claim_count)
+            difference = future_date - current_date
+            if current_date < future_date:
+                days = difference.days
+                seconds = difference.total_seconds()
+                hours = int(seconds // 3600)
+                minutes = int((seconds % 3600) // 60)
+                seconds = int(seconds % 60)
+                print(f"{days} días, {hours % 24} horas, {minutes} minutos, {seconds} segundos para reclamar")
             if claim_count == 0:
                 if current_timestamp >= vesting_start_time:
                     return True
@@ -157,8 +167,6 @@ class TokenTrader:
                     if price > min_sell_price:
                         if self.can_claim_tokens(presale_data, vesting_data, user_data):
                             self.claim_tokens()
-                        else:
-                            print("No se puede reclamar en este momento.")
                         balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
                         balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
                         print(f"Balance actual: {balance_float} {self.token_input_symbol}")
