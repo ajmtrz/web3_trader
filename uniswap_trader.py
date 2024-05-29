@@ -1,7 +1,6 @@
 # %%
 from web3 import Web3, middleware
-#from web3.gas_strategies.rpc import rpc_gas_price_strategy
-from web3.gas_strategies.time_based import fast_gas_price_strategy
+from web3.gas_strategies.rpc import rpc_gas_price_strategy
 from web3.middleware import construct_sign_and_send_raw_middleware
 from uniswap import Uniswap
 import requests
@@ -19,7 +18,7 @@ class TokenTrader:
         self.rpc_url = "https://rpc.ankr.com/eth"
         self.etherscan_api_key = etherscan_api_key
         self.web3 = Web3(Web3.HTTPProvider(self.rpc_url))
-        self.web3.eth.set_gas_price_strategy(fast_gas_price_strategy)
+        self.web3.eth.set_gas_price_strategy(rpc_gas_price_strategy)
         self.web3.middleware_onion.add(middleware.time_based_cache_middleware)
         self.web3.middleware_onion.add(middleware.latest_block_based_cache_middleware)
         self.web3.middleware_onion.add(middleware.simple_cache_middleware)
