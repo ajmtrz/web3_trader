@@ -114,24 +114,21 @@ class TokenTrader:
                     return True
         return False
     
-    def claim_tokens(self, presale_data, vesting_data, user_data):
-        if self.can_claim_tokens(presale_data, vesting_data, user_data):
-            print(f"Intentando reclamar...")
-            while True:
-                try:
-                    tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
-                    print(f"Esperando por confirmación de la transacción de reclamo: {tx_hash.hex()}")
-                    tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-                    if tx_receipt.status == 1:
-                        print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
-                        break
-                    else:
-                        raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
-                except Exception as tx_exception:
-                    print(f"Error en el reclamo: {tx_exception}")
-                    time.sleep(5)
-        else:
-            print("No se puede reclamar en este momento.")
+    def claim_tokens(self):
+        print(f"Intentando reclamar...")
+        while True:
+            try:
+                tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
+                print(f"Esperando por confirmación de la transacción de reclamo: {tx_hash.hex()}")
+                tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+                if tx_receipt.status == 1:
+                    print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
+                    break
+                else:
+                    raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
+            except Exception as tx_exception:
+                print(f"Error en el reclamo: {tx_exception}")
+                time.sleep(5)
     
     def make_swap(self, qty, price):
         print(f"Vendiendo {qty / (10 ** self.token_input_decimals)} {self.token_input_symbol} a {price} {self.token_output_symbol}")
@@ -166,7 +163,10 @@ class TokenTrader:
                                     / 10**self.token_output_decimals)
                     print(f"Precio actual: {price} {self.token_output_symbol} | Mínimo: {min_sell_price}")
                     if price > min_sell_price:
-                        self.claim_tokens(presale_data, vesting_data, user_data)
+                        if self.can_claim_tokens(presale_data, vesting_data, user_data):
+                            self.claim_tokens()
+                        else:
+                            print("No se puede reclamar en este momento.")
                         balance_int = self.token_input_object.functions.balanceOf(self.wallet_address).call()
                         balance_float = np.round(balance_int / (10 ** self.token_input_decimals), 6)
                         print(f"Balance actual: {balance_float} {self.token_input_symbol}")
