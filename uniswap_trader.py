@@ -115,36 +115,29 @@ class TokenTrader:
     
     def claim_tokens(self):
         print(f"Intentando reclamar...")
-        while True:
-            try:
-                tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
-                print(f"Esperando por confirmación de la transacción de reclamo: {tx_hash.hex()}")
-                tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-                if tx_receipt.status == 1:
-                    print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
-                    break
-                else:
-                    raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
-            except Exception as tx_exception:
-                print(f"Error en el reclamo: {tx_exception}")
-                time.sleep(5)
+        try:
+            tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
+            print(f"Esperando por confirmación de la transacción de reclamo: {tx_hash.hex()}")
+            tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+            if tx_receipt.status == 1:
+                print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
+            else:
+                raise Exception(f"Transacción de reclamo fallida: {tx_hash.hex()}")
+        except Exception as tx_exception:
+            print(f"Error en el reclamo: {tx_exception}")
     
     def make_swap(self, qty, price):
         print(f"Vendiendo {qty / (10 ** self.token_input_decimals)} {self.token_input_symbol} a {price} {self.token_output_symbol}")
-        while True:
-            try:
-                tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
-                print(f"Esperando por confirmación de la transacción de swap: {tx_hash.hex()}")
-                # Esperar a que la transacción sea confirmada
-                tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-                if tx_receipt.status == 1:
-                    print(f"Swap realizado! Transacción confirmada: {tx_hash.hex()}")
-                    break
-                else:
-                    raise Exception(f"Transacción de swap fallida: {tx_hash.hex()}")
-            except Exception as tx_exception:
-                    print(f"Error en el swap: {tx_exception}")
-                    time.sleep(5)
+        try:
+            tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
+            print(f"Esperando por confirmación de la transacción de swap: {tx_hash.hex()}")
+            tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+            if tx_receipt.status == 1:
+                print(f"Swap realizado! Transacción confirmada: {tx_hash.hex()}")
+            else:
+                raise Exception(f"Transacción de swap fallida: {tx_hash.hex()}")
+        except Exception as tx_exception:
+                print(f"Error en el swap: {tx_exception}")
 
     def trade(self):
         while True:
