@@ -46,7 +46,7 @@ class TokenTrader:
         self.token_output_symbol = self.token_output_object.functions.symbol().call()
         self.token_output_decimals = self.token_output_object.functions.decimals().call()
         # Prices array
-        self.token_prices = np.linspace(0.09, 2.99, 20)
+        self.token_prices = np.linspace(0.09, 2.99, 20, endpoint=False)
      
     def get_contract_abi(self, contract_address):
         try:
