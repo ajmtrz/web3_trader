@@ -118,7 +118,7 @@ class TokenTrader:
         try:
             tx_hash = self.token_presale_contract_object.functions.claimAmount(self.presale_id).transact()
             print(f"Esperando por confirmación de la transacción de reclamo: {tx_hash.hex()}")
-            tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+            tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
             if tx_receipt.status == 1:
                 print(f"Reclamo realizado! Transacción confirmada: {tx_hash.hex()}")
             else:
@@ -131,7 +131,7 @@ class TokenTrader:
         try:
             tx_hash = self.uniswap.make_trade(self.token_input_address, self.token_output_address, qty)
             print(f"Esperando por confirmación de la transacción de swap: {tx_hash.hex()}")
-            tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+            tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
             if tx_receipt.status == 1:
                 print(f"Swap realizado! Transacción confirmada: {tx_hash.hex()}")
             else:
