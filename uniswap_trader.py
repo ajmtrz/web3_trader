@@ -61,29 +61,6 @@ class TokenTrader:
             print(f"Ha ocurrido un error al obtener el ABI: {e}")
             return None
         
-    def staking_balance(self, contract_address, account_address, abi):
-        contract = self.web3.eth.contract(address=contract_address, abi=abi)
-        balance = contract.functions.getStakingBalance(account_address).call()
-        return balance
-    
-    def stake_tokens(self, contract_address, abi, amount):
-        contract = self.web3.eth.contract(address=contract_address, abi=abi)
-        tx_hash = contract.functions.stakeTokens(amount).transact()
-        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-        if tx_receipt.status == 1:
-            print(f"Staking realizado! Transacción confirmada: {tx_hash.hex()}")
-        else:
-            raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
-
-    def unstake_tokens(self, contract_address, abi, amount):
-        contract = self.web3.eth.contract(address=contract_address, abi=abi)
-        tx_hash = contract.functions.unstakeTokens(amount).transact()
-        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-        if tx_receipt.status == 1:
-            print(f"Unstaking realizado! Transacción confirmada: {tx_hash.hex()}")
-        else:
-            raise Exception(f"Transacción de staking fallida: {tx_hash.hex()}")
-        
     def can_claim_tokens(self, presale_data, vesting_data, user_data):
         claim_enabled = presale_data[9]
         vesting_start_time = vesting_data[0]
@@ -159,10 +136,10 @@ class TokenTrader:
                     print(f"Precio actual: {price} {self.token_output_symbol} | Umbral mínimo: {min_sell_price:.6f} {self.token_output_symbol}")
                     if self.can_claim_tokens(presale_data, vesting_data, user_data):
                         if price > min_sell_price:
-                                self.claim_tokens()
-                                balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
-                                if balance >= active_percent_amount:
-                                    self.make_swap(active_percent_amount, price)
+                            self.claim_tokens()
+                            balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
+                            if balance >= active_percent_amount:
+                                self.make_swap(active_percent_amount, price)
                     time.sleep(1)
                 else:
                     raise Exception(f"Error al conectar a la red de Ethereum")
