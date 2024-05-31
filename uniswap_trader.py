@@ -123,9 +123,6 @@ class TokenTrader:
         while True:
             try:
                 if self.web3.is_connected():
-                    print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
-                    price = (self.uniswap.get_price_input(self.token_input_address, self.token_output_address, 10**self.token_input_decimals, fee=3000)
-                             / 10**self.token_output_decimals)
                     presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
                     vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
                     user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
@@ -133,13 +130,19 @@ class TokenTrader:
                     active_percent_amount = user_data[6]
                     threshold_price_count = claimed_amount // active_percent_amount
                     min_sell_price = self.token_prices[threshold_price_count]
+                    print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
+                    price = (self.uniswap.get_price_input(self.token_input_address, self.token_output_address, 10**self.token_input_decimals, fee=3000)
+                             / 10**self.token_output_decimals)
                     print(f"Precio actual: {price} {self.token_output_symbol} | Umbral mínimo: {min_sell_price:.6f} {self.token_output_symbol}")
-                    if self.can_claim_tokens(presale_data, vesting_data, user_data):
-                        if price > min_sell_price:
-                            self.claim_tokens()
-                            balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
-                            if balance >= active_percent_amount:
-                                self.make_swap(active_percent_amount, price)
+                    if price > min_sell_price:
+                        balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
+                        if balance >= active_percent_amount:
+                            self.make_swap(active_percent_amount, price)
+                        else: 
+                            if self.can_claim_tokens(presale_data, vesting_data, user_data):
+                                self.claim_tokens()
+                                if balance >= active_percent_amount:
+                                    self.make_swap(active_percent_amount, price)
                     time.sleep(1)
                 else:
                     raise Exception(f"Error al conectar a la red de Ethereum")
