@@ -128,7 +128,7 @@ class TokenTrader:
                     print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
                     price = (self.uniswap.get_price_input(self.token_input_address, self.token_output_address, 10**self.token_input_decimals, fee=3000)
                              / 10**self.token_output_decimals)
-                    print(f"Precio actual: {price} {self.token_output_symbol} | Umbral mínimo: {min_sell_price:.6f} {self.token_output_symbol}")
+                    print(f"Precio actual: {price} {self.token_output_symbol} | Umbral {threshold_price_count} mínimo: {min_sell_price:.6f} {self.token_output_symbol}")
                     if price > min_sell_price:
                         balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
                         if balance >= active_percent_amount:
