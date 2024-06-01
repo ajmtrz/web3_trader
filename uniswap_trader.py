@@ -133,11 +133,8 @@ class TokenTrader:
                         balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
                         if balance >= active_percent_amount:
                             self.make_swap(active_percent_amount, price)
-                        else: 
-                            if self.can_claim_tokens(presale_data, vesting_data, user_data):
-                                self.claim_tokens()
-                                if balance >= active_percent_amount:
-                                    self.make_swap(active_percent_amount, price)
+                        elif self.can_claim_tokens(presale_data, vesting_data, user_data):
+                            self.claim_tokens()
                     time.sleep(1)
                 else:
                     raise Exception(f"Error al conectar a la red de Ethereum")
