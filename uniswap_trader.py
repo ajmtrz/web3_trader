@@ -13,10 +13,10 @@ import keyring
 # %%
 class TokenTrader:
     def __init__(self, etherscan_api_key, wallet_address, private_key, token_input_address, 
-                 token_output_address, token_presale_contract_address, uniswap_factory_contract_address):
+                 token_output_address, token_presale_contract_address, uniswap_factory_contract_address, token_prices):
         self.rpc_url = "https://rpc.ankr.com/eth"
-        self.etherscan_api_key = etherscan_api_key
         self.web3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        self.etherscan_api_key = etherscan_api_key
         self.private_key = private_key
         self.wallet_address = self.web3.to_checksum_address(wallet_address)
         self.web3.eth.default_account = self.wallet_address
@@ -42,7 +42,7 @@ class TokenTrader:
         self.token_output_symbol = self.token_output_object.functions.symbol().call()
         self.token_output_decimals = self.token_output_object.functions.decimals().call()
         # Prices array
-        self.token_prices = np.linspace(0.09, 0.99, 20, endpoint=False)
+        self.token_prices = token_prices
      
     def get_contract_abi(self, contract_address):
         try:
@@ -156,11 +156,13 @@ if __name__ == "__main__":
         token_output_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         token_presale_contract_address = "0x602C90D796D746b97a36f075d9f3b2892B9B07c2"
         uniswap_factory_contract_address = "0x1458770554b8918B970444d8b2c02A47F6dF99A7"
+        token_prices_array = np.linspace(0.09, 2.99, 20, endpoint=False)
         token_trader = TokenTrader(etherscan_api_key,
                                 wallet_address, 
                                 private_key,
                                 token_input_address,
                                 token_output_address,
                                 token_presale_contract_address,
-                                uniswap_factory_contract_address)
+                                uniswap_factory_contract_address,
+                                token_prices_array)
         token_trader.trade()
