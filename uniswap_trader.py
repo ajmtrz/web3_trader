@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import numpy as np
 import gnupg
 import keyring
+import os
 
 # %%
 class TokenTrader:
@@ -145,7 +146,8 @@ class TokenTrader:
 # %%
 if __name__ == "__main__":
     gpg = gnupg.GPG()
-    with open('C:\\Users\\Administrador\\Repositorios\\web3_trader\\.env.gpg', 'rb') as file:
+    encrypted_file_path = os.path.expanduser('~/Repositorios/web3_trader/.env.gpg')
+    with open(encrypted_file_path, 'rb') as file:
         datos = gpg.decrypt_file(file, passphrase=keyring.get_password("GPG_Passphrase", "gpg_python"))
     if datos.ok:
         env_vars = dict(line.decode('utf-8').split('=', 1) for line in datos.data.splitlines())
