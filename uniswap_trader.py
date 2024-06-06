@@ -14,7 +14,7 @@ import os
 # %%
 class TokenTrader:
     def __init__(self, etherscan_api_key, wallet_address, private_key, token_input_address, 
-                 token_output_address, token_presale_contract_address, uniswap_factory_contract_address, token_prices):
+                 token_output_address, token_presale_contract_address, uniswap_factory_contract_address):
         self.rpc_url = "https://rpc.ankr.com/eth"
         self.web3 = Web3(Web3.HTTPProvider(self.rpc_url))
         self.etherscan_api_key = etherscan_api_key
@@ -42,8 +42,6 @@ class TokenTrader:
         self.token_output_object = self.web3.eth.contract(address=self.token_output_address, abi=self.token_output_abi)
         self.token_output_symbol = self.token_output_object.functions.symbol().call()
         self.token_output_decimals = self.token_output_object.functions.decimals().call()
-        # Prices array
-        self.token_prices = token_prices
      
     def get_contract_abi(self, contract_address):
         try:
@@ -57,11 +55,13 @@ class TokenTrader:
             print(f"Ha ocurrido un error al obtener el ABI: {e}")
             return None
         
-    def can_claim_tokens(self, presale_data, vesting_data, user_data):
+    def can_claim_tokens(self):
+        presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
+        vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
+        user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
         claim_enabled = presale_data[9]
         vesting_start_time = vesting_data[0]
         vesting_interval = vesting_data[2]
-        total_claim_cycles = vesting_data[4]
         claimable_amount = user_data[2]
         claim_count = user_data[5]
         current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
@@ -78,15 +78,8 @@ class TokenTrader:
                 minutes = int((seconds % 3600) // 60)
                 seconds = int(seconds % 60)
                 print(f"{days} días, {hours % 24} horas, {minutes} minutos, {seconds} segundos para reclamar")
-            # Cantidad en vesting
-            if claim_count == 0:
-                if current_timestamp >= vesting_start_time:
-                    return True
             else:
-                duration_since_start = current_timestamp - vesting_start_time
-                available_cycles = duration_since_start // vesting_interval
-                if available_cycles > claim_count and available_cycles <= total_claim_cycles:
-                    return True
+                return True
         return False
     
     def claim_tokens(self):
@@ -119,29 +112,22 @@ class TokenTrader:
         while True:
             try:
                 if self.web3.is_connected():
-                    presale_data = self.token_presale_contract_object.functions.presale(self.presale_id).call()
-                    vesting_data = self.token_presale_contract_object.functions.vesting(self.presale_id).call()
-                    user_data = self.token_presale_contract_object.functions.userClaimData(self.wallet_address, self.presale_id).call()
-                    claimed_amount = user_data[4]
-                    active_percent_amount = user_data[6]
-                    threshold_price_count = claimed_amount // active_percent_amount
-                    min_sell_price = self.token_prices[threshold_price_count]
                     print(f'\n{datetime.now(tz=timezone.utc).strftime("%d-%m-%Y %H:%M:%S")}')
                     price = (self.uniswap.get_price_input(self.token_input_address, self.token_output_address, 10**self.token_input_decimals, fee=3000)
                              / 10**self.token_output_decimals)
-                    print(f"Precio actual: {price} {self.token_output_symbol} | Umbral {threshold_price_count} mínimo: {min_sell_price:.6f} {self.token_output_symbol}")
-                    if price > min_sell_price:
-                        balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
-                        if balance >= active_percent_amount:
-                            self.make_swap(active_percent_amount, price)
-                        elif self.can_claim_tokens(presale_data, vesting_data, user_data):
+                    print(f"Precio actual: {price} {self.token_output_symbol}")
+                    if price > 0.04:
+                        if self.can_claim_tokens():
                             self.claim_tokens()
+                        balance = self.token_input_object.functions.balanceOf(self.wallet_address).call()
+                        if balance > 0:
+                            self.make_swap(balance, price)
                     time.sleep(1)
                 else:
                     raise Exception(f"Error al conectar a la red de Ethereum")
             except Exception as e:
                 print(f"Ha ocurrido un error: {e}")
-                time.sleep(5)
+                time.sleep(1)
 
 # %%
 if __name__ == "__main__":
@@ -158,13 +144,11 @@ if __name__ == "__main__":
         token_output_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         token_presale_contract_address = "0x602C90D796D746b97a36f075d9f3b2892B9B07c2"
         uniswap_factory_contract_address = "0x1458770554b8918B970444d8b2c02A47F6dF99A7"
-        token_prices_array = np.linspace(0.09, 2.99, 20, endpoint=False)
         token_trader = TokenTrader(etherscan_api_key,
                                 wallet_address, 
                                 private_key,
                                 token_input_address,
                                 token_output_address,
                                 token_presale_contract_address,
-                                uniswap_factory_contract_address,
-                                token_prices_array)
+                                uniswap_factory_contract_address)
         token_trader.trade()
