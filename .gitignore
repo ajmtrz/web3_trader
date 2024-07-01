@@ -1,2 +1,4 @@
 # Ignorar el archivo .env
 .env.gpg
+# Ignore .py exported file
+*.py
